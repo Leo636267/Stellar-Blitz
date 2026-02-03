@@ -17,7 +17,7 @@
     background:var(--dark-bg); font-family:'Orbitron',sans-serif;
     color:#fff; overflow:hidden; height:100%;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    user-select:none; -webkit-user-select:none; touch-action:none;
+    user-select:none; -webkit-user-select:none;
   }
 
   /* ── Canvas responsive + landscape support ── */
@@ -56,6 +56,7 @@
     border:1px solid rgba(0,240,255,0.15);
     box-shadow:0 0 40px rgba(0,240,255,0.08),inset 0 0 80px rgba(0,0,0,0.6);
     border-radius:4px;
+    touch-action:none; /* prevent scroll/zoom on canvas */
   }
 
   /* ── HUD ── */
@@ -261,10 +262,14 @@
     color:#1a7a3a; text-shadow:0 1px 4px rgba(20,120,50,0.3);
   }
 
-  /* Audio slider panel — top-left, same baseline as title */
+  /* Audio slider panel — top-left */
   #audio-controls {
     position:absolute; top:36px; left:24px; z-index:3;
     display:flex; flex-direction:column; gap:6px;
+  }
+  @media (min-width: 600px) {
+    /* Desktop / landscape — move down to avoid title overlap */
+    #audio-controls { top:98px; }
   }
   .audio-row {
     display:flex; align-items:center; gap:6px;
@@ -275,7 +280,7 @@
   .audio-slider-wrap {
     width:80px; height:20px;
     display:flex; align-items:center;
-    touch-action:none; cursor:pointer;
+    cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
   .audio-slider-track {
@@ -600,7 +605,7 @@ function makeSliderDrag(wrapId, callback) {
 
   function getVal(e) {
     const rect = track.getBoundingClientRect();
-    let x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    let x = e.clientX - rect.left;
     return Math.max(0, Math.min(100, Math.round(x / rect.width * 100)));
   }
 
@@ -609,12 +614,16 @@ function makeSliderDrag(wrapId, callback) {
     wrap.setPointerCapture(e.pointerId);
     dragging = true;
     initAudio();
-    callback(getVal(e));
+    const val = getVal(e);
+    callback(val);
+    syncSliders();
   });
   wrap.addEventListener('pointermove', e => {
     if (!dragging) return;
     e.preventDefault();
-    callback(getVal(e));
+    const val = getVal(e);
+    callback(val);
+    syncSliders();
   });
   wrap.addEventListener('pointerup',     e => { dragging = false; });
   wrap.addEventListener('pointercancel', e => { dragging = false; });
@@ -1069,6 +1078,11 @@ let liveLog = [];            // array of strings: how each life was lost
 let livesAtWaveStart = 4;    // snapshot when wave spawns
 let perfectTimer = 0;        // frames left for PERFECT WAVE banner (100 ≈ 1.6 s)
 
+// Visual effects timers
+let muzzleFlashTimer = 0;    // frames left for muzzle flash (3 frames)
+let waveFlashTimer = 0;      // frames left for "WAVE N" big flash (90 frames)
+let waveFlashNumber = 0;     // which wave number to show
+
 // Audio system
 let audioCtx;
 let musicGainNode;
@@ -1146,6 +1160,10 @@ function spawnWave() {
   wave++;
   waveText.textContent = wave;
   livesAtWaveStart = lives;  // snapshot for perfect-wave check
+  
+  // Trigger big "WAVE N" flash on screen
+  waveFlashTimer = 90;
+  waveFlashNumber = wave;
   const cols = wave === 1 ? 6 : (wave === 2 ? 7 : 8 + Math.min(wave - 2, 4)); // fewer enemies early
   const rows = wave === 1 ? 2 : 2 + Math.min(Math.floor((wave - 1) / 2), 3);
   const marginX = 50;
@@ -1212,6 +1230,7 @@ function playerShoot() {
   if (player.cooldown > 0) return;
   player.cooldown = 8; // faster shooting (was 11)
   bullets.push({ x: player.x, y: player.y - 22, vy: -13, color: '#00f0ff', w: 3, h: 15 });
+  muzzleFlashTimer = 3; // trigger muzzle flash
   playShootSound();
 }
 
@@ -1608,6 +1627,8 @@ function update(dt) {
     if (waveDelay > 80) { spawnWave(); waveDelay = 0; }
   }
   if (perfectTimer > 0) perfectTimer--;
+  if (muzzleFlashTimer > 0) muzzleFlashTimer--;
+  if (waveFlashTimer > 0) waveFlashTimer--;
 
   // Anti-camping tracker
   if (Math.abs(player.x - playerLastX) < 2) {
@@ -1805,6 +1826,42 @@ function draw(time) {
       ctx.shadowBlur = 0;
       ctx.restore();
     }
+
+    // ── Muzzle flash ──
+    if (muzzleFlashTimer > 0 && lives > 0) {
+      ctx.save();
+      ctx.globalAlpha = muzzleFlashTimer / 3; // fade over 3 frames
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur  = 18;
+      ctx.fillStyle   = '#fff';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y - 26, 6 + (3 - muzzleFlashTimer) * 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // ── WAVE N flash (big center screen) ──
+    if (waveFlashTimer > 0) {
+      // Fade: in 15 frames, hold, out 15 frames
+      let a = 1;
+      if (waveFlashTimer > 75) a = (90 - waveFlashTimer) / 15;
+      if (waveFlashTimer < 15) a = waveFlashTimer / 15;
+
+      ctx.save();
+      ctx.globalAlpha = a * 0.75; // semi-transparent so gameplay visible behind
+
+      // Big "WAVE N" text
+      ctx.shadowColor = 'rgba(0,240,255,0.7)';
+      ctx.shadowBlur  = 28;
+      ctx.fillStyle   = '#00f0ff';
+      ctx.font        = 'bold 60px Orbitron, sans-serif';
+      ctx.textAlign   = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('WAVE ' + waveFlashNumber, W / 2, H / 2 - 20);
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
   }
 }
 
@@ -1901,8 +1958,8 @@ function applyJoystick(touch) {
   if (dx >  maxDist) dx =  maxDist;
   if (dx < -maxDist) dx = -maxDist;
 
-  // Dead zone — ~10 % of radius prevents drift when thumb is "still"
-  const dead = maxDist * 0.1;
+  // Dead zone — ~5% of radius prevents drift when thumb is "still"
+  const dead = maxDist * 0.05;
   if (Math.abs(dx) < dead) dx = 0;
 
   joystickStick.style.transform = `translate(${dx}px, 0px)`;
