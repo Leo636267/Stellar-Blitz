@@ -88,11 +88,12 @@
     position:absolute; bottom:0; left:0; right:0; height:140px;
     display:none; z-index:12; pointer-events:none;
   }
+  /* Show on touch devices only */
   @media (hover:none) and (pointer:coarse) {
     #mobile-controls { display:block; }
   }
-  /* Fallback for devices where hover:none fails (Samsung, etc.) */
-  @media (max-width: 768px) {
+  /* Fallback for Samsung devices where hover:none fails — still check pointer:coarse */
+  @media (max-width: 768px) and (pointer:coarse) {
     #mobile-controls { display:block !important; }
   }
   
@@ -615,22 +616,31 @@ function makeSliderDrag(wrapId, callback) {
 
   function getVal(e) {
     const rect = track.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
     
-    // Detect rotation (portrait mode forced landscape)
-    const isRotated = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
-    
+    // Get pointer position
     let x = e.clientX;
     let y = e.clientY;
     
-    // Transform coordinates if rotated 90°
+    // Detect rotation
+    const isRotated = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
+    
+    // Calculate offset from track center
+    let dx = x - centerX;
+    let dy = y - centerY;
+    
+    // If rotated, swap axes (slider is horizontal in game space, but vertical in physical space)
     if (isRotated) {
-      const vh = window.innerHeight;
-      const origX = x, origY = y;
-      x = vh - origY;
-      y = origX;
+      const temp = dx;
+      dx = -dy;
+      dy = temp;
     }
     
-    const relX = x - rect.left;
+    // Convert to position along track (left edge to right edge)
+    const trackLeft = rect.left;
+    let relX = dx + rect.width / 2; // offset from center + half width = offset from left
+    
     return Math.max(0, Math.min(100, Math.round(relX / rect.width * 100)));
   }
 
@@ -1956,26 +1966,31 @@ document.addEventListener('touchcancel', onGlobalTouchEnd);
 
 // ── Joystick math: horizontal-only, with dead-zone ──
 function applyJoystick(touch) {
-  const rect    = joystickArea.getBoundingClientRect();
+  // Get joystick center in viewport coords
+  const rect = joystickArea.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;
-
-  // Detect if we're in portrait mode with rotation (landscape forced)
-  const isRotated = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
-
-  let touchX = touch.clientX;
-  let touchY = touch.clientY;
-
-  // If rotated 90°, transform coordinates: (x,y) → (viewHeight - y, x)
-  if (isRotated) {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const origX = touchX, origY = touchY;
-    touchX = vh - origY;
-    touchY = origX;
-  }
-
+  
+  // Touch coords in viewport
+  const touchX = touch.clientX;
+  const touchY = touch.clientY;
+  
+  // Calculate offset from center
   let dx = touchX - centerX;
+  let dy = touchY - centerY;
+  
+  // For horizontal-only joystick, we only care about X axis
+  // But if container is rotated, X and Y are swapped in physical space
+  // Detect rotation and swap axes if needed
+  const isRotated = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
+  
+  if (isRotated) {
+    // When rotated 90deg clockwise, physical left-right becomes viewport up-down
+    // So we use dy (vertical movement in viewport) as our dx (horizontal in game)
+    const temp = dx;
+    dx = -dy;  // negative because viewport Y increases downward
+    dy = temp;
+  }
 
   const maxDist = rect.width / 2 - 12;
   if (dx >  maxDist) dx =  maxDist;
