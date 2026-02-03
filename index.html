@@ -106,7 +106,6 @@
     width:45px; height:45px; margin:-22.5px 0 0 -22.5px;
     border-radius:50%; background:rgba(0,240,255,0.4);
     border:2px solid var(--neon-cyan); box-shadow:0 0 12px rgba(0,240,255,0.5);
-    transition: transform 0.1s;
   }
   
   /* Shoot button (right) */
@@ -262,32 +261,39 @@
     color:#1a7a3a; text-shadow:0 1px 4px rgba(20,120,50,0.3);
   }
 
-  /* Audio slider panel — bottom-left, above hint line */
+  /* Audio slider panel — top-left, same baseline as title */
   #audio-controls {
-    position:absolute; bottom:50px; left:16px; z-index:3;
-    display:flex; flex-direction:column; gap:10px;
+    position:absolute; top:36px; left:24px; z-index:3;
+    display:flex; flex-direction:column; gap:6px;
   }
   .audio-row {
-    display:flex; align-items:center; gap:8px;
-    background:rgba(255,255,255,0.22); border-radius:8px;
-    padding:6px 10px; backdrop-filter:blur(4px);
+    display:flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,0.18); border-radius:6px;
+    padding:5px 8px; backdrop-filter:blur(4px);
   }
-  .audio-icon { font-size:18px; width:22px; text-align:center; flex-shrink:0; }
-  .audio-slider {
-    -webkit-appearance:none; appearance:none;
-    width:90px; height:6px; border-radius:3px;
-    background:rgba(0,100,160,0.3); outline:none;
+  .audio-icon { font-size:14px; width:18px; text-align:center; flex-shrink:0; }
+  .audio-slider-wrap {
+    width:80px; height:20px;
+    display:flex; align-items:center;
+    touch-action:none; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
-  .audio-slider::-webkit-slider-thumb {
-    -webkit-appearance:none; appearance:none;
-    width:18px; height:18px; border-radius:50%;
-    background:var(--neon-cyan); cursor:pointer;
-    box-shadow:0 0 6px rgba(0,240,255,0.5);
+  .audio-slider-track {
+    position:relative; width:100%; height:5px;
+    background:rgba(0,100,160,0.25); border-radius:3px;
   }
-  .audio-slider::-moz-range-thumb {
-    width:18px; height:18px; border-radius:50%; border:none;
-    background:var(--neon-cyan); cursor:pointer;
-    box-shadow:0 0 6px rgba(0,240,255,0.5);
+  .audio-slider-fill {
+    position:absolute; top:0; left:0; height:100%;
+    background:linear-gradient(90deg, rgba(0,180,220,0.7), var(--neon-cyan));
+    border-radius:3px; width:50%; /* JS driven */
+  }
+  .audio-slider-thumb {
+    position:absolute; top:50%;
+    width:16px; height:16px; border-radius:50%;
+    background:var(--neon-cyan);
+    box-shadow:0 0 5px rgba(0,240,255,0.55);
+    transform:translate(-50%, -50%);
+    left:50%; /* JS driven */
   }
 
   /* ── Controls hint ── */
@@ -440,13 +446,21 @@
     <div id="audio-controls">
       <div class="audio-row">
         <span class="audio-icon">🔊</span>
-        <input type="range" id="music-slider" class="audio-slider" min="0" max="100" value="50"
-               oninput="onMusicSlider(this.value)" ontouchstart="initAudio()" />
+        <div class="audio-slider-wrap" id="music-slider-wrap">
+          <div class="audio-slider-track">
+            <div class="audio-slider-fill" id="music-fill"></div>
+            <div class="audio-slider-thumb" id="music-thumb"></div>
+          </div>
+        </div>
       </div>
       <div class="audio-row">
         <span class="audio-icon">🔔</span>
-        <input type="range" id="sfx-slider" class="audio-slider" min="0" max="100" value="60"
-               oninput="onSFXSlider(this.value)" ontouchstart="initAudio()" />
+        <div class="audio-slider-wrap" id="sfx-slider-wrap">
+          <div class="audio-slider-track">
+            <div class="audio-slider-fill" id="sfx-fill"></div>
+            <div class="audio-slider-thumb" id="sfx-thumb"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -567,18 +581,57 @@ function initAudio() {
 }
 
 function syncSliders() {
-  const ms = document.getElementById('music-slider');
-  const ss = document.getElementById('sfx-slider');
-  if (ms) ms.value = Math.round(musicVolume / 0.3 * 100);
-  if (ss) ss.value = Math.round(sfxVolume   / 0.3 * 100);
+  const mPct = Math.round(musicVolume / 0.3 * 100);
+  const sPct = Math.round(sfxVolume   / 0.3 * 100);
+  const mf = document.getElementById('music-fill'),  mt = document.getElementById('music-thumb');
+  const sf = document.getElementById('sfx-fill'),    st = document.getElementById('sfx-thumb');
+  if (mf) mf.style.width = mPct + '%';
+  if (mt) mt.style.left  = mPct + '%';
+  if (sf) sf.style.width = sPct + '%';
+  if (st) st.style.left  = sPct + '%';
+}
+
+// ── Custom slider pointer-event wiring ──
+function makeSliderDrag(wrapId, callback) {
+  const wrap  = document.getElementById(wrapId);
+  if (!wrap) return;
+  const track = wrap.querySelector('.audio-slider-track');
+  let dragging = false;
+
+  function getVal(e) {
+    const rect = track.getBoundingClientRect();
+    let x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    return Math.max(0, Math.min(100, Math.round(x / rect.width * 100)));
+  }
+
+  wrap.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    wrap.setPointerCapture(e.pointerId);
+    dragging = true;
+    initAudio();
+    callback(getVal(e));
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    e.preventDefault();
+    callback(getVal(e));
+  });
+  wrap.addEventListener('pointerup',     e => { dragging = false; });
+  wrap.addEventListener('pointercancel', e => { dragging = false; });
+}
+
+function initCustomSliders() {
+  makeSliderDrag('music-slider-wrap', onMusicSlider);
+  makeSliderDrag('sfx-slider-wrap',   onSFXSlider);
+  syncSliders(); // paint initial positions
 }
 
 function onMusicSlider(val) {
   musicVolume = val / 100 * 0.3;
   localStorage.setItem('stellarblitz_music_vol', val);
   if (musicGainNode) musicGainNode.gain.value = musicVolume;
-  // If music was off and user slides up, start it
-  if (val > 0 && state === 'menu' && musicOscillators.length === 0) playMusic();
+  if (val > 0 && state === 'menu') playMusic();
+  if (val <= 0) stopMusic();
 }
 
 function onSFXSlider(val) {
@@ -588,10 +641,16 @@ function onSFXSlider(val) {
 }
 
 // Procedural chill ambient music (slow evolving pads)
+let musicGenId = 0; // incremented every stopMusic — kills stale playChord chains
+
 function playMusic() {
   initAudio();
-  if (musicOscillators.length > 0) return;
-  if (musicVolume <= 0) return; // slider at 0 = no music
+  if (musicVolume <= 0) return;
+
+  // Kill any previous chain before starting a new one
+  musicGenId++;
+  const myGen = musicGenId;
+  musicOscillators = [];
 
   const chordProgression = [
     [220.00, 261.63, 329.63],
@@ -602,7 +661,8 @@ function playMusic() {
   let chordIndex = 0;
 
   function playChord() {
-    if (state !== 'menu' || musicVolume <= 0) return;
+    if (myGen !== musicGenId) return;  // stale chain → stop
+    if (musicVolume <= 0) return;
     const freqs = chordProgression[chordIndex];
     chordIndex = (chordIndex + 1) % chordProgression.length;
     freqs.forEach((freq, i) => {
@@ -625,6 +685,7 @@ function playMusic() {
 }
 
 function stopMusic() {
+  musicGenId++;  // invalidates any running playChord chain
   musicOscillators.forEach(osc => { try { osc.stop(); } catch(e){} });
   musicOscillators = [];
 }
@@ -701,6 +762,28 @@ function playExplosionSound(pitchMult = 1.0) {
   rumbleGain.connect(sfxGainNode);
   rumble.start();
   rumble.stop(audioCtx.currentTime + 0.4);
+}
+
+// Rising celebratory jingle for PERFECT WAVE
+function playPerfectSound() {
+  initAudio();
+  if (sfxVolume <= 0) return;
+  // E5 → G5 → B5 → E6  — bright ascending arp
+  const notes = [659.25, 783.99, 987.77, 1318.51];
+  notes.forEach((freq, i) => {
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = audioCtx.currentTime + i * 0.11;
+    gain.gain.value = 0;
+    gain.gain.linearRampToValueAtTime(0.22, t + 0.025);
+    gain.gain.linearRampToValueAtTime(0,    t + 0.25);
+    osc.connect(gain);
+    gain.connect(sfxGainNode);
+    osc.start(t);
+    osc.stop(t + 0.28);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -982,6 +1065,10 @@ let playerStillFrames = 0;
 let deathReason = '';        // final cause of game over
 let liveLog = [];            // array of strings: how each life was lost
 
+// Perfect-wave banner
+let livesAtWaveStart = 4;    // snapshot when wave spawns
+let perfectTimer = 0;        // frames left for PERFECT WAVE banner (100 ≈ 1.6 s)
+
 // Audio system
 let audioCtx;
 let musicGainNode;
@@ -1058,6 +1145,7 @@ const ENEMY_DEFS = [
 function spawnWave() {
   wave++;
   waveText.textContent = wave;
+  livesAtWaveStart = lives;  // snapshot for perfect-wave check
   const cols = wave === 1 ? 6 : (wave === 2 ? 7 : 8 + Math.min(wave - 2, 4)); // fewer enemies early
   const rows = wave === 1 ? 2 : 2 + Math.min(Math.floor((wave - 1) / 2), 3);
   const marginX = 50;
@@ -1507,9 +1595,19 @@ function update(dt) {
 
   // Next wave
   if (enemies.length === 0 && state === 'playing') {
+    if (waveDelay === 0 && wave > 0) {
+      // First frame after last enemy died — check perfect
+      if (lives === livesAtWaveStart) {
+        score += 500;
+        scoreText.textContent = score;
+        perfectTimer = 100;
+        playPerfectSound();
+      }
+    }
     waveDelay++;
     if (waveDelay > 80) { spawnWave(); waveDelay = 0; }
   }
+  if (perfectTimer > 0) perfectTimer--;
 
   // Anti-camping tracker
   if (Math.abs(player.x - playerLastX) < 2) {
@@ -1669,6 +1767,44 @@ function draw(time) {
         ctx.drawImage(spr, player.x - sw/2, player.y - sh/2, sw, sh);
       }
     }
+
+    // ── PERFECT WAVE banner ──
+    if (perfectTimer > 0) {
+      // Ease: fade in first 18 frames, hold, fade out last 18 frames
+      let a = 1;
+      if (perfectTimer > 82) a = (100 - perfectTimer) / 18;
+      if (perfectTimer < 18) a = perfectTimer / 18;
+
+      ctx.save();
+      ctx.globalAlpha = a;
+
+      // Dark pill bg
+      const bw = 300, bh = 62, bx = (W - bw) / 2, by = (H - bh) / 2;
+      ctx.fillStyle = 'rgba(4,4,16,0.75)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 8);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(57,255,20,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Glow + text
+      ctx.shadowColor = 'rgba(57,255,20,0.55)';
+      ctx.shadowBlur  = 16;
+      ctx.fillStyle   = '#39ff14';
+      ctx.font        = 'bold 24px Orbitron, sans-serif';
+      ctx.textAlign   = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PERFECT WAVE', W / 2, by + 24);
+
+      ctx.shadowBlur  = 8;
+      ctx.fillStyle   = 'rgba(57,255,20,0.7)';
+      ctx.font        = '13px Share Tech Mono, monospace';
+      ctx.fillText('+500 PTS', W / 2, by + 46);
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
   }
 }
 
@@ -1696,84 +1832,82 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
 // ── Mobile on-screen controls: Joystick + Shoot button ──
-const joystickArea = document.getElementById('joystick-area');
+const joystickArea  = document.getElementById('joystick-area');
 const joystickStick = document.getElementById('joystick-stick');
-const shootBtn = document.getElementById('shoot-btn');
+const shootBtn      = document.getElementById('shoot-btn');
 
 let joystickTouchId = null;
-let shootTouchId = null;
+let shootTouchId    = null;
 
-// Joystick
+// ── Joystick: capture on pad, track globally ──
 if (joystickArea) {
   joystickArea.addEventListener('touchstart', e => {
     e.preventDefault();
-    if (joystickTouchId === null && e.changedTouches.length > 0) {
-      joystickTouchId = e.changedTouches[0].identifier;
-      handleJoystickMove(e.changedTouches[0]);
-    }
-  }, { passive: false });
-
-  joystickArea.addEventListener('touchmove', e => {
-    e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === joystickTouchId) {
-        handleJoystickMove(e.changedTouches[i]);
-        break;
-      }
-    }
-  }, { passive: false });
-
-  joystickArea.addEventListener('touchend', e => {
-    e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === joystickTouchId) {
-        joystickTouchId = null;
-        joystickActive = false;
-        joystickDeltaX = 0;
-        joystickStick.style.transform = 'translate(0, 0)';
-        break;
-      }
-    }
+    if (joystickTouchId !== null) return;
+    joystickTouchId = e.changedTouches[0].identifier;
+    initAudio();
+    applyJoystick(e.changedTouches[0]);
   }, { passive: false });
 }
 
-function handleJoystickMove(touch) {
-  const rect = joystickArea.getBoundingClientRect();
-  const centerX = rect.left + rect.width / 2;
-  
-  let dx = touch.clientX - centerX;
-  
-  // Clamp to radius (horizontal only)
-  const maxDist = rect.width / 2 - 15;
-  if (dx > maxDist)  dx = maxDist;
-  if (dx < -maxDist) dx = -maxDist;
-  
-  // Move stick visually only on X axis — Y stays centered
-  joystickStick.style.transform = `translate(${dx}px, 0px)`;
-  joystickActive = true;
-  joystickDeltaX = dx / maxDist; // -1 to 1
-}
-
-// Shoot button
+// Shoot button: capture on button
 if (shootBtn) {
   shootBtn.addEventListener('touchstart', e => {
     e.preventDefault();
-    if (shootTouchId === null && e.changedTouches.length > 0) {
-      shootTouchId = e.changedTouches[0].identifier;
-      touchShoot = true;
-    }
+    if (shootTouchId !== null) return;
+    shootTouchId = e.changedTouches[0].identifier;
+    touchShoot   = true;
+    initAudio();
   }, { passive: false });
+}
 
-  shootBtn.addEventListener('touchend', e => {
-    e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === shootTouchId) {
-        shootTouchId = null;
-        touchShoot = false;
-        break;
-      }
+// ── Global move — routes each tracked finger ──
+document.addEventListener('touchmove', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === joystickTouchId) {
+      e.preventDefault();
+      applyJoystick(t);
     }
-  }, { passive: false });
+  }
+}, { passive: false });
+
+// ── Global end / cancel ──
+function onGlobalTouchEnd(e) {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const id = e.changedTouches[i].identifier;
+    if (id === joystickTouchId) {
+      joystickTouchId = null;
+      joystickActive  = false;
+      joystickDeltaX  = 0;
+      joystickStick.style.transform = 'translate(0px, 0px)';
+    }
+    if (id === shootTouchId) {
+      shootTouchId = null;
+      touchShoot   = false;
+    }
+  }
+}
+document.addEventListener('touchend',    onGlobalTouchEnd);
+document.addEventListener('touchcancel', onGlobalTouchEnd);
+
+// ── Joystick math: horizontal-only, with dead-zone ──
+function applyJoystick(touch) {
+  const rect    = joystickArea.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  let   dx      = touch.clientX - centerX;
+
+  const maxDist = rect.width / 2 - 12;
+  if (dx >  maxDist) dx =  maxDist;
+  if (dx < -maxDist) dx = -maxDist;
+
+  // Dead zone — ~10 % of radius prevents drift when thumb is "still"
+  const dead = maxDist * 0.1;
+  if (Math.abs(dx) < dead) dx = 0;
+
+  joystickStick.style.transform = `translate(${dx}px, 0px)`;
+  joystickActive = true;
+  joystickDeltaX = dx / maxDist; // -1 … 0 … +1
 }
 
 // ─── START / MENU ─────────────────────────────────────────
@@ -1813,6 +1947,7 @@ bullets = []; enemies = []; enemyBullets = []; explosions = [];
 for (let i = 0; i < MAX_PARTICLES; i++) particlePool[i] = { active: false };
 particleCount = 0;
 loadHighScore().then(() => showMenu());
+initCustomSliders();
 requestAnimationFrame(loop);
 </script>
 </body>
