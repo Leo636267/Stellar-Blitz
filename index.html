@@ -27,20 +27,27 @@
     aspect-ratio:680/720;
   }
   
-  /* Force landscape on mobile */
+  /* Force landscape on mobile — shrunk to clear browser chrome */
   @media (max-width: 768px) and (orientation: portrait) {
     #game-wrap {
       transform: rotate(90deg);
       transform-origin: center center;
-      width: 100vh;
+      width: calc(100vh - 50px);
       height: 100vw;
-      max-width: 100vh;
+      max-width: calc(100vh - 50px);
       max-height: 100vw;
       position: fixed;
       top: 50%;
       left: 50%;
-      margin-left: -50vh;
+      margin-left: calc(-50vh + 25px);
       margin-top: -50vw;
+    }
+  }
+  /* Landscape orientation on mobile — also constrain */
+  @media (max-width: 768px) and (orientation: landscape) {
+    #game-wrap {
+      max-height: calc(100vh - 30px);
+      max-width: calc(100vw - 20px);
     }
   }
   
@@ -191,7 +198,8 @@
   #overlay-best  { color:#1a7a3a; text-shadow:0 1px 4px rgba(20,120,50,0.3); }
   .score-row.hidden { display:none; }
 
-  .btn-row { display:flex; gap:12px; }
+  .btn-row { display:flex; flex-direction:column; gap:12px; align-items:flex-end; }
+  .btn-row .btn-actions { display:flex; gap:12px; }
   .btn {
     font-family:'Orbitron',sans-serif; font-size:12px; font-weight:700;
     letter-spacing:2px; text-transform:uppercase; color:#fff;
@@ -211,6 +219,34 @@
   .btn.secondary:hover { background:rgba(255,255,255,0.75);
     box-shadow:0 3px 12px rgba(0,80,120,0.25); }
 
+  /* ── Death log card (game over screen) ── */
+  .death-log {
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(0,100,160,0.18);
+    border-radius:8px; padding:12px 18px;
+    display:flex; flex-direction:column; gap:6px;
+    backdrop-filter:blur(3px);
+    margin-bottom:4px;
+  }
+  .death-log-title {
+    font-family:'Share Tech Mono',monospace;
+    font-size:8px; letter-spacing:3px; text-transform:uppercase;
+    color:rgba(40,70,100,0.45); margin-bottom:2px;
+    padding-bottom:6px;
+    border-bottom:1px solid rgba(0,100,160,0.15);
+  }
+  .death-log-entry {
+    font-family:'Share Tech Mono',monospace;
+    font-size:10px; color:rgba(30,55,85,0.75);
+    letter-spacing:0.5px; display:flex; align-items:center; gap:8px;
+  }
+  .death-log-entry .log-num {
+    font-size:9px; font-weight:700; color:rgba(180,60,60,0.7);
+    min-width:18px; text-align:right; flex-shrink:0;
+  }
+  .death-log-entry .log-icon { flex-shrink:0; font-size:11px; }
+  .death-log-entry .log-text { flex:1; }
+
   /* Menu highscore — bottom left */
   #menu-hs {
     position:absolute; bottom:40px; left:40px;
@@ -226,18 +262,33 @@
     color:#1a7a3a; text-shadow:0 1px 4px rgba(20,120,50,0.3);
   }
 
-  /* Audio control buttons (top-left) */
+  /* Audio slider panel — bottom-left, above hint line */
   #audio-controls {
-    position:absolute; top:12px; left:12px; z-index:3;
-    display:flex; flex-direction:column; gap:8px;
+    position:absolute; bottom:50px; left:16px; z-index:3;
+    display:flex; flex-direction:column; gap:10px;
   }
-  .audio-btn {
-    width:38px; height:38px; border:none;
-    background:rgba(255,255,255,0.25); border-radius:8px;
-    font-size:20px; cursor:pointer; transition:all 0.2s;
-    backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center;
+  .audio-row {
+    display:flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,0.22); border-radius:8px;
+    padding:6px 10px; backdrop-filter:blur(4px);
   }
-  .audio-btn:hover { background:rgba(255,255,255,0.4); }
+  .audio-icon { font-size:18px; width:22px; text-align:center; flex-shrink:0; }
+  .audio-slider {
+    -webkit-appearance:none; appearance:none;
+    width:90px; height:6px; border-radius:3px;
+    background:rgba(0,100,160,0.3); outline:none;
+  }
+  .audio-slider::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none;
+    width:18px; height:18px; border-radius:50%;
+    background:var(--neon-cyan); cursor:pointer;
+    box-shadow:0 0 6px rgba(0,240,255,0.5);
+  }
+  .audio-slider::-moz-range-thumb {
+    width:18px; height:18px; border-radius:50%; border:none;
+    background:var(--neon-cyan); cursor:pointer;
+    box-shadow:0 0 6px rgba(0,240,255,0.5);
+  }
 
   /* ── Controls hint ── */
   #controls-hint {
@@ -284,6 +335,47 @@
     box-shadow:none; font-size:10px; padding:9px 22px; }
   .pause-btn.sec:hover { border-color:rgba(255,255,255,0.45); color:#fff;
     background:rgba(255,255,255,0.05); }
+
+  /* ── In-game pause button (top-right, mobile only) ── */
+  #pause-btn {
+    position:absolute; top:6px; right:6px; z-index:11;
+    width:34px; height:34px; border-radius:6px;
+    background:rgba(10,10,30,0.75); border:1px solid rgba(0,240,255,0.35);
+    display:none; align-items:center; justify-content:center;
+    cursor:pointer; pointer-events:all; backdrop-filter:blur(4px);
+  }
+  #pause-btn.visible { display:flex; }
+  #pause-btn svg { width:16px; height:16px; }
+
+  /* ── NEW HIGHSCORE celebration ── */
+  #new-hs-banner {
+    position:absolute; inset:0; z-index:25;
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    pointer-events:none;
+  }
+  #new-hs-banner.visible { display:flex; }
+  #new-hs-banner .banner-text {
+    font-family:'Orbitron',sans-serif; font-size:clamp(28px,6vw,48px);
+    font-weight:900; letter-spacing:4px; text-transform:uppercase;
+    color:var(--neon-yellow);
+    text-shadow: 0 0 12px rgba(255,230,0,0.7), 0 0 40px rgba(255,200,0,0.4);
+    animation: bannerPulse 0.6s ease-in-out infinite alternate;
+  }
+  #new-hs-banner .banner-sub {
+    font-family:'Share Tech Mono',monospace; font-size:clamp(11px,2.5vw,16px);
+    color:rgba(255,230,0,0.7); letter-spacing:6px; margin-top:8px;
+    text-shadow: 0 0 10px rgba(255,200,0,0.5);
+  }
+  @keyframes bannerPulse {
+    from { transform:scale(1); opacity:0.85; }
+    to   { transform:scale(1.06); opacity:1; }
+  }
+  /* Confetti canvas overlay */
+  #confetti-canvas {
+    position:absolute; inset:0; z-index:24;
+    pointer-events:none; display:none;
+  }
+  #confetti-canvas.visible { display:block; }
 </style>
 </head>
 <body>
@@ -311,17 +403,30 @@
 
   <canvas id="game"></canvas>
 
+  <!-- In-game pause button (mobile only, top-right) -->
+  <div id="pause-btn" onclick="togglePause()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--neon-cyan)" stroke-width="2.5" stroke-linecap="round">
+      <line x1="6" y1="4" x2="6" y2="20"/><line x1="18" y1="4" x2="18" y2="20"/>
+    </svg>
+  </div>
+
   <!-- Mobile on-screen controls -->
   <div id="mobile-controls">
-    <!-- Joystick (left) -->
     <div id="joystick-area">
       <div id="joystick-base">
         <div id="joystick-stick"></div>
       </div>
     </div>
-    
-    <!-- Shoot button (right) -->
     <div id="shoot-btn">FIRE</div>
+  </div>
+
+  <!-- Confetti canvas (new highscore) -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- NEW HIGHSCORE banner -->
+  <div id="new-hs-banner">
+    <div class="banner-text">NEW BEST!</div>
+    <div class="banner-sub">HIGHSCORE</div>
   </div>
 
   <!-- Menu overlay -->
@@ -331,10 +436,18 @@
     <div id="overlay-stripe"></div>
     <div id="overlay-dots"></div>
 
-    <!-- Audio control buttons (top-left) -->
+    <!-- Audio sliders (top-left) -->
     <div id="audio-controls">
-      <button id="music-btn" class="audio-btn" onclick="toggleMute()">🔊</button>
-      <button id="sfx-btn" class="audio-btn" onclick="toggleSFX()">🔔</button>
+      <div class="audio-row">
+        <span class="audio-icon">🔊</span>
+        <input type="range" id="music-slider" class="audio-slider" min="0" max="100" value="50"
+               oninput="onMusicSlider(this.value)" ontouchstart="initAudio()" />
+      </div>
+      <div class="audio-row">
+        <span class="audio-icon">🔔</span>
+        <input type="range" id="sfx-slider" class="audio-slider" min="0" max="100" value="60"
+               oninput="onSFXSlider(this.value)" ontouchstart="initAudio()" />
+      </div>
     </div>
 
     <div id="overlay-top">
@@ -359,7 +472,7 @@
         </div>
       </div>
       <div class="btn-row" id="btn-row">
-        <button class="btn" id="start-btn">START GAME</button>
+        <!-- buttons injected dynamically by showMenu / showGameOver -->
       </div>
     </div>
 
@@ -391,7 +504,6 @@ canvas.width = W; canvas.height = H;
 
 // ─── DOM refs ─────────────────────────────────────────────
 const overlay      = document.getElementById('overlay');
-const startBtn     = document.getElementById('start-btn');
 const overlayTitle = document.getElementById('overlay-title');
 const overlaySub   = document.getElementById('overlay-sub');
 const overlayScore = document.getElementById('overlay-score');
@@ -425,7 +537,6 @@ async function saveHighScore(s) {
   }
 }
 loadHighScore();
-document.getElementById('start-btn').onclick = startGame;
 
 // ═══════════════════════════════════════════════════════════
 // AUDIO SYSTEM — Web Audio API
@@ -434,153 +545,160 @@ document.getElementById('start-btn').onclick = startGame;
 function initAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Music gain
   musicGainNode = audioCtx.createGain();
   musicGainNode.connect(audioCtx.destination);
-  musicGainNode.gain.value = isMusicMuted ? 0 : 0.15;
-  
-  // Load preferences from localStorage
-  const savedMusic = localStorage.getItem('stellarblitz_music_muted');
-  const savedSFX = localStorage.getItem('stellarblitz_sfx_muted');
-  if (savedMusic === 'true') {
-    isMusicMuted = true;
-    musicGainNode.gain.value = 0;
-  }
-  if (savedSFX === 'true') {
-    isSFXMuted = true;
-  }
+
+  // SFX gain
+  sfxGainNode = audioCtx.createGain();
+  sfxGainNode.connect(audioCtx.destination);
+
+  // Load saved volumes (stored as 0–100 integer)
+  const savedMV = localStorage.getItem('stellarblitz_music_vol');
+  const savedSV = localStorage.getItem('stellarblitz_sfx_vol');
+  if (savedMV !== null) { musicVolume = Number(savedMV) / 100 * 0.3; }
+  if (savedSV !== null) { sfxVolume   = Number(savedSV) / 100 * 0.3; }
+  musicGainNode.gain.value = musicVolume;
+  sfxGainNode.gain.value   = sfxVolume;
+
+  // Sync sliders
+  syncSliders();
+}
+
+function syncSliders() {
+  const ms = document.getElementById('music-slider');
+  const ss = document.getElementById('sfx-slider');
+  if (ms) ms.value = Math.round(musicVolume / 0.3 * 100);
+  if (ss) ss.value = Math.round(sfxVolume   / 0.3 * 100);
+}
+
+function onMusicSlider(val) {
+  musicVolume = val / 100 * 0.3;
+  localStorage.setItem('stellarblitz_music_vol', val);
+  if (musicGainNode) musicGainNode.gain.value = musicVolume;
+  // If music was off and user slides up, start it
+  if (val > 0 && state === 'menu' && musicOscillators.length === 0) playMusic();
+}
+
+function onSFXSlider(val) {
+  sfxVolume = val / 100 * 0.3;
+  localStorage.setItem('stellarblitz_sfx_vol', val);
+  if (sfxGainNode) sfxGainNode.gain.value = sfxVolume;
 }
 
 // Procedural chill ambient music (slow evolving pads)
 function playMusic() {
   initAudio();
-  if (musicOscillators.length > 0) return; // already playing
-  
-  // Ambient pad progression: Am → F → C → G
+  if (musicOscillators.length > 0) return;
+  if (musicVolume <= 0) return; // slider at 0 = no music
+
   const chordProgression = [
-    [220.00, 261.63, 329.63], // Am (A4, C5, E5)
-    [174.61, 220.00, 261.63], // F  (F3, A4, C5)
-    [130.81, 164.81, 196.00], // C  (C3, E3, G3)
-    [196.00, 246.94, 293.66]  // G  (G3, B3, D4)
+    [220.00, 261.63, 329.63],
+    [174.61, 220.00, 261.63],
+    [130.81, 164.81, 196.00],
+    [196.00, 246.94, 293.66]
   ];
-  
   let chordIndex = 0;
-  
+
   function playChord() {
-    if (state !== 'menu' || isMusicMuted) return;
-    
+    if (state !== 'menu' || musicVolume <= 0) return;
     const freqs = chordProgression[chordIndex];
     chordIndex = (chordIndex + 1) % chordProgression.length;
-    
     freqs.forEach((freq, i) => {
-      const osc = audioCtx.createOscillator();
+      const osc     = audioCtx.createOscillator();
       const gainEnv = audioCtx.createGain();
-      
-      osc.type = i === 0 ? 'sine' : 'triangle'; // bass sine, others triangle
+      osc.type = i === 0 ? 'sine' : 'triangle';
       osc.frequency.value = freq;
-      
       gainEnv.gain.value = 0;
       gainEnv.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 1.5);
-      gainEnv.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 8);
-      
+      gainEnv.gain.linearRampToValueAtTime(0,    audioCtx.currentTime + 8);
       osc.connect(gainEnv);
       gainEnv.connect(musicGainNode);
-      
       osc.start();
       osc.stop(audioCtx.currentTime + 8);
-      
       musicOscillators.push(osc);
     });
-    
-    setTimeout(playChord, 8000); // next chord after 8 seconds
+    setTimeout(playChord, 8000);
   }
-  
   playChord();
 }
 
 function stopMusic() {
-  musicOscillators.forEach(osc => {
-    try { osc.stop(); } catch(e) {}
-  });
+  musicOscillators.forEach(osc => { try { osc.stop(); } catch(e){} });
   musicOscillators = [];
 }
 
+// Legacy toggle helpers (kept for compatibility, now just toggle vol 0 ↔ default)
 function toggleMute() {
-  isMusicMuted = !isMusicMuted;
-  localStorage.setItem('stellarblitz_music_muted', isMusicMuted);
-  if (musicGainNode) musicGainNode.gain.value = isMusicMuted ? 0 : 0.15;
-  updateAudioButtons();
-  if (!isMusicMuted && state === 'menu') playMusic();
+  initAudio();
+  if (musicVolume > 0) { musicVolume = 0; } else { musicVolume = 0.15; }
+  if (musicGainNode) musicGainNode.gain.value = musicVolume;
+  localStorage.setItem('stellarblitz_music_vol', Math.round(musicVolume / 0.3 * 100));
+  syncSliders();
+  if (musicVolume > 0 && state === 'menu') playMusic();
 }
-
 function toggleSFX() {
-  isSFXMuted = !isSFXMuted;
-  localStorage.setItem('stellarblitz_sfx_muted', isSFXMuted);
-  updateAudioButtons();
+  initAudio();
+  if (sfxVolume > 0) { sfxVolume = 0; } else { sfxVolume = 0.18; }
+  if (sfxGainNode) sfxGainNode.gain.value = sfxVolume;
+  localStorage.setItem('stellarblitz_sfx_vol', Math.round(sfxVolume / 0.3 * 100));
+  syncSliders();
 }
 
-function updateAudioButtons() {
-  const musicBtn = document.getElementById('music-btn');
-  const sfxBtn = document.getElementById('sfx-btn');
-  if (musicBtn) musicBtn.textContent = isMusicMuted ? '🔇' : '🔊';
-  if (sfxBtn) sfxBtn.textContent = isSFXMuted ? '🔕' : '🔔';
-}
+function updateAudioButtons() { syncSliders(); }
 
-// Sound effects
+// ── Sound effects (all routed through sfxGainNode) ──
 function playShootSound() {
-  if (!audioCtx || isSFXMuted) { initAudio(); if (isSFXMuted) return; }
-  const osc = audioCtx.createOscillator();
+  initAudio();
+  if (sfxVolume <= 0) return;
+  const osc  = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-  
   osc.type = 'square';
   osc.frequency.value = 800;
   osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.05);
-  
-  gain.gain.value = 0.08;
+  gain.gain.value = 0.4; // relative; master controlled by sfxGainNode
   gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
-  
   osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  
+  gain.connect(sfxGainNode);
   osc.start();
   osc.stop(audioCtx.currentTime + 0.05);
 }
 
 function playExplosionSound(pitchMult = 1.0) {
-  if (!audioCtx || isSFXMuted) { initAudio(); if (isSFXMuted) return; }
-  
-  // Noise burst + low sine rumble
-  const noise = audioCtx.createBufferSource();
+  initAudio();
+  if (sfxVolume <= 0) return;
+
+  // Noise burst
+  const noise       = audioCtx.createBufferSource();
   const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.3, audioCtx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
+  const data        = noiseBuffer.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   noise.buffer = noiseBuffer;
-  
+
   const noiseFilter = audioCtx.createBiquadFilter();
-  noiseFilter.type = 'lowpass';
+  noiseFilter.type  = 'lowpass';
   noiseFilter.frequency.value = 300 * pitchMult;
-  
+
   const noiseGain = audioCtx.createGain();
-  noiseGain.gain.value = 0.15;
+  noiseGain.gain.value = 0.5;
   noiseGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-  
+
   noise.connect(noiseFilter);
   noiseFilter.connect(noiseGain);
-  noiseGain.connect(audioCtx.destination);
-  
+  noiseGain.connect(sfxGainNode);
   noise.start();
   noise.stop(audioCtx.currentTime + 0.3);
-  
+
   // Rumble
-  const rumble = audioCtx.createOscillator();
+  const rumble     = audioCtx.createOscillator();
   const rumbleGain = audioCtx.createGain();
   rumble.type = 'sine';
   rumble.frequency.value = 60 * pitchMult;
-  rumbleGain.gain.value = 0.2;
+  rumbleGain.gain.value  = 0.6;
   rumbleGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-  
   rumble.connect(rumbleGain);
-  rumbleGain.connect(audioCtx.destination);
-  
+  rumbleGain.connect(sfxGainNode);
   rumble.start();
   rumble.stop(audioCtx.currentTime + 0.4);
 }
@@ -860,11 +978,16 @@ let lastTime = 0;
 let playerLastX = 0;
 let playerStillFrames = 0;
 
+// Death tracking
+let deathReason = '';        // final cause of game over
+let liveLog = [];            // array of strings: how each life was lost
+
 // Audio system
 let audioCtx;
 let musicGainNode;
-let isMusicMuted = false;
-let isSFXMuted = false;
+let sfxGainNode;
+let musicVolume = 0.15;   // default music volume (0–0.3 range mapped from slider 0–100)
+let sfxVolume   = 0.18;   // default sfx volume
 let musicOscillators = [];
 
 // Joystick state (mobile)
@@ -872,6 +995,10 @@ let joystickActive = false;
 let joystickDeltaX = 0;
 
 const pauseOverlay = document.getElementById('pause-overlay');
+const pauseBtnEl   = document.getElementById('pause-btn');
+const confettiCanvas = document.getElementById('confetti-canvas');
+const confettiCtx  = confettiCanvas.getContext('2d');
+const newHsBanner  = document.getElementById('new-hs-banner');
 const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
 // ─── MENU BG ANIMATION ────────────────────────────────────
@@ -1018,32 +1145,185 @@ function updateLives() {
 
 // ─── GAME OVER OVERLAY ────────────────────────────────────
 function showGameOver() {
+  pauseBtnEl.classList.remove('visible');
+  const isNewBest = score > highScore;
   saveHighScore(score);
+
   overlayTitle.textContent = 'GAME OVER';
-  overlaySub.textContent = 'You have fallen';
+  overlaySub.textContent   = deathReason || 'You have fallen';
   overlayScore.textContent = score;
-  overlayBest.textContent = highScore;
+  overlayBest.textContent  = highScore;
   scoreRow.classList.remove('hidden');
 
-  // Build buttons: Play Again + Menu
   btnRow.innerHTML = '';
+
+  // ── Life log card ──
+  if (liveLog.length > 0) {
+    const card = document.createElement('div');
+    card.className = 'death-log';
+
+    const title = document.createElement('div');
+    title.className = 'death-log-title';
+    title.textContent = 'How you died';
+    card.appendChild(title);
+
+    const icons = { bullet:'💥', collision:'💥', unknown:'⚠️' };
+
+    liveLog.forEach((entry, idx) => {
+      const row = document.createElement('div');
+      row.className = 'death-log-entry';
+
+      const num = document.createElement('span');
+      num.className = 'log-num';
+      num.textContent = '#' + (idx + 1);
+
+      const icon = document.createElement('span');
+      icon.className = 'log-icon';
+      icon.textContent = icons[entry.type] || '⚠️';
+
+      const text = document.createElement('span');
+      text.className = 'log-text';
+      text.textContent = entry.reason;
+
+      const wave_badge = document.createElement('span');
+      wave_badge.style.cssText = 'font-size:8px;color:rgba(0,100,160,0.5);'
+        + 'background:rgba(0,100,160,0.1);padding:2px 6px;border-radius:4px;'
+        + 'letter-spacing:1px;flex-shrink:0;';
+      wave_badge.textContent = 'W' + entry.wave;
+
+      row.appendChild(num);
+      row.appendChild(icon);
+      row.appendChild(text);
+      row.appendChild(wave_badge);
+      card.appendChild(row);
+    });
+
+    btnRow.appendChild(card);
+  }
+
+  const actionsRow = document.createElement('div');
+  actionsRow.className = 'btn-actions';
+
   const playBtn = document.createElement('button');
   playBtn.className = 'btn';
   playBtn.textContent = 'PLAY AGAIN';
   playBtn.onclick = startGame;
-  btnRow.appendChild(playBtn);
+  actionsRow.appendChild(playBtn);
 
   const menuBtn = document.createElement('button');
   menuBtn.className = 'btn secondary';
   menuBtn.textContent = 'MENU';
   menuBtn.onclick = showMenu;
-  btnRow.appendChild(menuBtn);
+  actionsRow.appendChild(menuBtn);
+
+  btnRow.appendChild(actionsRow);
 
   overlay.classList.remove('hidden');
+
+  if (isNewBest) triggerNewHighscore();
+}
+
+// ── Confetti system ──
+let confettiPieces = [];
+let confettiAnimId = null;
+
+function triggerNewHighscore() {
+  // Size confetti canvas to match game-wrap
+  const wrap = document.getElementById('game-wrap');
+  const r = wrap.getBoundingClientRect();
+  confettiCanvas.width  = r.width;
+  confettiCanvas.height = r.height;
+  confettiCanvas.classList.add('visible');
+  newHsBanner.classList.add('visible');
+
+  // Spawn confetti
+  confettiPieces = [];
+  const colors = ['#ffe600','#ff2d7b','#00f0ff','#39ff14','#a855f7','#f97316','#fff'];
+  for (let i = 0; i < 120; i++) {
+    confettiPieces.push({
+      x: Math.random() * confettiCanvas.width,
+      y: -Math.random() * confettiCanvas.height * 0.4,
+      w: 6 + Math.random() * 6,
+      h: 4 + Math.random() * 3,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 3,
+      vy: 2.5 + Math.random() * 3,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.25,
+      life: 1
+    });
+  }
+
+  // Play a celebratory arpeggio sound
+  playConfettiSound();
+
+  if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
+  animateConfetti();
+}
+
+function animateConfetti() {
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+  let anyAlive = false;
+  for (let i = 0; i < confettiPieces.length; i++) {
+    const p = confettiPieces[i];
+    p.x  += p.vx;
+    p.y  += p.vy;
+    p.rot += p.rotV;
+    p.vx *= 0.995; // tiny drag
+
+    // Fade out once past bottom
+    if (p.y > confettiCanvas.height) {
+      p.life -= 0.04;
+    }
+    if (p.life <= 0) continue;
+    anyAlive = true;
+
+    confettiCtx.save();
+    confettiCtx.translate(p.x, p.y);
+    confettiCtx.rotate(p.rot);
+    confettiCtx.globalAlpha = p.life;
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+    confettiCtx.restore();
+  }
+
+  if (anyAlive) {
+    confettiAnimId = requestAnimationFrame(animateConfetti);
+  } else {
+    // All gone — hide after a beat
+    setTimeout(() => {
+      confettiCanvas.classList.remove('visible');
+      newHsBanner.classList.remove('visible');
+    }, 600);
+  }
+}
+
+function playConfettiSound() {
+  initAudio();
+  if (sfxVolume <= 0) return;
+  const notes = [523.25, 659.25, 783.99, 1046.50];
+  notes.forEach((freq, i) => {
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = audioCtx.currentTime + i * 0.12;
+    gain.gain.value = 0;
+    gain.gain.linearRampToValueAtTime(0.5, t + 0.04);
+    gain.gain.linearRampToValueAtTime(0,   t + 0.35);
+    osc.connect(gain);
+    gain.connect(sfxGainNode);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  });
 }
 
 function showMenu() {
   pauseOverlay.classList.remove('visible');
+  pauseBtnEl.classList.remove('visible');
+  newHsBanner.classList.remove('visible');
+  confettiCanvas.classList.remove('visible');
   paused = false;
   overlayTitle.textContent = 'STELLAR BLITZ';
   overlaySub.textContent = 'Defend the galaxy';
@@ -1070,7 +1350,7 @@ function showMenu() {
   joystickDeltaX = 0;
   
   // Start ambient music
-  if (!isMusicMuted) playMusic();
+  if (musicVolume > 0) playMusic();
   updateAudioButtons();
 }
 
@@ -1123,7 +1403,9 @@ function update(dt) {
     if (e.x + e.w/2 > W - 10 || e.x - e.w/2 < 10) hitEdge = true;
     
     // BREACH CHECK — if enemy reaches player level, instant game over
-    if (e.y > player.y - 10) { // at same level (was +40, below player)
+    if (e.y > player.y - 10) {
+      deathReason = 'The enemy line reached you';
+      liveLog.push({ reason: 'Enemy formation breached your line', type: 'breach', wave: wave });
       lives = 0;
       state = 'gameover';
       explode(player.x, player.y, '#00f0ff', 28, 4.5);
@@ -1179,7 +1461,7 @@ function update(dt) {
       const b = enemyBullets[i];
       if (overlap(b.x, b.y, b.w, b.h, player.x, player.y, player.w, player.h)) {
         enemyBullets.splice(i, 1);
-        playerHit();
+        playerHit('Hit by enemy fire', 'bullet');
         break;
       }
     }
@@ -1197,7 +1479,7 @@ function update(dt) {
         explode(e.x, e.y, e.color, 10, 2.5);
         addExplosion(e.x, e.y, e.color);
         playExplosionSound(0.9);
-        playerHit();
+        playerHit('Collided with an enemy', 'collision');
         break;
       }
     }
@@ -1238,17 +1520,19 @@ function update(dt) {
   playerLastX = player.x;
 }
 
-function playerHit() {
+function playerHit(reason, type) {
   lives--;
+  liveLog.push({ reason: reason || 'Unknown', type: type || 'unknown', wave: wave });
   updateLives();
   explode(player.x, player.y, '#00f0ff', 20, 3.8);
   addExplosion(player.x, player.y, '#00f0ff');
   playExplosionSound(0.8);
   if (lives <= 0) {
+    deathReason = reason || 'Unknown cause';
     state = 'gameover';
     setTimeout(showGameOver, 1100);
   } else {
-    player.invulnerable = 180; // longer invuln (was 120)
+    player.invulnerable = 180;
   }
 }
 
@@ -1456,20 +1740,16 @@ if (joystickArea) {
 function handleJoystickMove(touch) {
   const rect = joystickArea.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
   
   let dx = touch.clientX - centerX;
-  let dy = touch.clientY - centerY;
   
+  // Clamp to radius (horizontal only)
   const maxDist = rect.width / 2 - 15;
-  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dx > maxDist)  dx = maxDist;
+  if (dx < -maxDist) dx = -maxDist;
   
-  if (dist > maxDist) {
-    dx = dx / dist * maxDist;
-    dy = dy / dist * maxDist;
-  }
-  
-  joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+  // Move stick visually only on X axis — Y stays centered
+  joystickStick.style.transform = `translate(${dx}px, 0px)`;
   joystickActive = true;
   joystickDeltaX = dx / maxDist; // -1 to 1
 }
@@ -1499,8 +1779,14 @@ if (shootBtn) {
 // ─── START / MENU ─────────────────────────────────────────
 function startGame() {
   pauseOverlay.classList.remove('visible');
+  newHsBanner.classList.remove('visible');
+  confettiCanvas.classList.remove('visible');
+  if (confettiAnimId) { cancelAnimationFrame(confettiAnimId); confettiAnimId = null; }
   paused = false;
-  score = 0; wave = 0; lives = 4; waveDelay = 50; // 4 lives
+  score = 0; wave = 0; lives = 4; waveDelay = 50;
+  deathReason = '';
+  liveLog = [];
+  btnRow.innerHTML = '';  // nuke any leftover overlay buttons from DOM
   scoreText.textContent = '0';
   waveText.textContent = '1';
   player = createPlayer();
@@ -1517,6 +1803,7 @@ function startGame() {
   playerStillFrames = 0; // Reset camping tracker
   playerLastX = W / 2;
   stopMusic(); // Stop menu music
+  if (isTouchDevice) pauseBtnEl.classList.add('visible');
   state = 'playing';
 }
 
@@ -1525,6 +1812,7 @@ initStars();
 bullets = []; enemies = []; enemyBullets = []; explosions = [];
 for (let i = 0; i < MAX_PARTICLES; i++) particlePool[i] = { active: false };
 particleCount = 0;
+loadHighScore().then(() => showMenu());
 requestAnimationFrame(loop);
 </script>
 </body>
