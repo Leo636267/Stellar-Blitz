@@ -616,32 +616,27 @@ function makeSliderDrag(wrapId, callback) {
 
   function getVal(e) {
     const rect = track.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
     
-    // Get pointer position
-    let x = e.clientX;
-    let y = e.clientY;
+    // Get pointer position in viewport
+    let pointerX = e.clientX;
+    let pointerY = e.clientY;
     
     // Detect rotation
     const isRotated = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
     
-    // Calculate offset from track center
-    let dx = x - centerX;
-    let dy = y - centerY;
-    
-    // If rotated, swap axes (slider is horizontal in game space, but vertical in physical space)
+    // If rotated, the slider appears vertical on screen but is horizontal in game space
+    // Physical up-down movement should change slider value
     if (isRotated) {
-      const temp = dx;
-      dx = -dy;
-      dy = temp;
+      // Use Y position instead of X, map to track width
+      // Track's visual top/bottom becomes our left/right in game space
+      const relY = pointerY - rect.top;
+      const pct = Math.max(0, Math.min(100, Math.round(relY / rect.height * 100)));
+      return pct;
+    } else {
+      // Normal horizontal slider
+      const relX = pointerX - rect.left;
+      return Math.max(0, Math.min(100, Math.round(relX / rect.width * 100)));
     }
-    
-    // Convert to position along track (left edge to right edge)
-    const trackLeft = rect.left;
-    let relX = dx + rect.width / 2; // offset from center + half width = offset from left
-    
-    return Math.max(0, Math.min(100, Math.round(relX / rect.width * 100)));
   }
 
   wrap.addEventListener('pointerdown', e => {
@@ -1988,7 +1983,7 @@ function applyJoystick(touch) {
     // When rotated 90deg clockwise, physical left-right becomes viewport up-down
     // So we use dy (vertical movement in viewport) as our dx (horizontal in game)
     const temp = dx;
-    dx = -dy;  // negative because viewport Y increases downward
+    dx = dy;  // swap without negation
     dy = temp;
   }
 
